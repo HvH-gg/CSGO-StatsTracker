@@ -56,7 +56,7 @@ enum struct PlayerStats {
     float TimeOnline;
     float SpawnTime;
     float ConnectTime;
-    char SteamId[20];
+    char SteamId[32];
     char Username[32];
 	bool SupposedToReset;
 

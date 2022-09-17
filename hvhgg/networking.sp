@@ -1,4 +1,5 @@
-char g_ApiToken[512] = "some-token";
+char g_HvHggToken[512] = "some-token";
+char g_ApiKey[512] = "some-token";
 bool g_bAuthenticated = true;
 
 void Networking_Init()
@@ -10,8 +11,9 @@ void Networking_GetApiToken()
 {
     if (g_bAuthenticated) return;
     PrintToServer("[HvH.gg] Starting authentication.")
-    HTTPRequest request = new HTTPRequest("http://localhost:8088/auth/token");
-    request.SetHeader("Authorization", "Bearer %s", "some-token");
+    HTTPRequest request = new HTTPRequest("https://api.hvh.gg/auth/token/session");
+    request.SetHeader("Authorization", "Bearer %s", g_HvHggToken);
+    request.SetHeader("Server-IP", "%s:%s", g_ServerIp, g_ServerPort);
     request.Get(OnGetApiToken);
 }
 
@@ -41,8 +43,9 @@ void Networking_OnRoundEnd()
     body.Set("players", g_RoundPlayers);
     body.Set("events", g_RoundEvents);
 
-    HTTPRequest request = new HTTPRequest("http://localhost:8088/match/public/stats");
-    request.SetHeader("API-Key", g_ApiToken);
+    HTTPRequest request = new HTTPRequest("https://api.hvh.gg/stats/public");
+    request.SetHeader("API-Key", g_ApiKey);
+    request.SetHeader("Server-IP", "%s:%s", g_ServerIp, g_ServerPort);
     request.Post(body, OnRoundEnd);
 
     delete body;
@@ -60,7 +63,7 @@ void OnGetApiToken(HTTPResponse response, any value)
 
     JSONObject apiToken = view_as<JSONObject>(response.Data);
     g_bAuthenticated = true;
-    apiToken.GetString("apiToken", g_ApiToken, sizeof(g_ApiToken));
+    apiToken.GetString("apiToken", g_ApiKey, sizeof(g_ApiKey));
 }
 
 void OnRoundEnd(HTTPResponse response, any value)

@@ -7,8 +7,9 @@ void Stats_Init()
 void Stats_OnClientPutInServer(int client)
 {
     // get steamId
-    char sID[20];
-    GetClientAuthId(client, AuthId_SteamID64, sID, sizeof(sID));
+    char sID[32];
+    if (!GetClientAuthId(client, AuthId_SteamID64, sID, sizeof(sID)))
+        return;
 
     // save username
     char Username[32];
