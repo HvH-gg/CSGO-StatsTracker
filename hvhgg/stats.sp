@@ -113,7 +113,11 @@ void Stats_OnHostageEvent(Event event, const char[] name)
 
 void Stats_OnRoundStart(Event event, const char[] name)
 {
+    Networking_OnRoundStart();
     PrintToServer("[HvH.gg] New round started.");
+    g_RoundEvents = new JSONArray();
+    g_RoundPlayers = new JSONArray();
+    g_EventNumber = 0;
 }
 
 void Stats_OnPlayerSpawned(Event event, const char[] name)
@@ -285,8 +289,6 @@ void Stats_OnRoundEnd(Event event, const char[] name)
     Stats_BuildEvent(name, kvPairs);
 
     delete kvPairs;
-
-    Networking_OnRoundEnd();
 }
 
 void Stats_BuildEvent(const char[] name, JSONArray kvPairs)

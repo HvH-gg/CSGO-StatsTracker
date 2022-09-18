@@ -17,7 +17,7 @@ void Networking_GetApiToken()
     request.Post(new JSONObject(), OnGetApiToken);
 }
 
-void Networking_OnRoundEnd()
+void Networking_OnRoundStart()
 {
     if (!g_bAuthenticated) return;
     PrintToServer("[HvH.gg] Sending round events list.")
@@ -46,7 +46,7 @@ void Networking_OnRoundEnd()
     HTTPRequest request = new HTTPRequest("https://api.hvh.gg/stats/public");
     request.SetHeader("API-Key", g_ApiKey);
     request.SetHeader("Server-IP", "%s:%s", g_ServerIp, g_ServerPort);
-    request.Post(body, OnRoundEnd);
+    request.Post(body, OnRoundStart);
 
     delete body;
     delete g_RoundEvents;
@@ -66,16 +66,11 @@ void OnGetApiToken(HTTPResponse response, any value)
     apiToken.GetString("apiToken", g_ApiKey, sizeof(g_ApiKey));
 }
 
-void OnRoundEnd(HTTPResponse response, any value)
+void OnRoundStart(HTTPResponse response, any value)
 {
     if (response.Status != HTTPStatus_NoContent) {
         PrintToServer("[HvH.gg] Failed to send round information. Not retrying.");
     }
-
-    // reset
-    g_RoundEvents = new JSONArray();
-    g_RoundPlayers = new JSONArray();
-    g_EventNumber = 0;
 }
 
 void Networking_DummyCallback(HTTPResponse response, any value) {}
