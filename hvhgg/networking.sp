@@ -1,6 +1,6 @@
 char g_HvHggToken[512] = "some-token";
 char g_ApiKey[512] = "some-token";
-bool g_bAuthenticated = true;
+bool g_bAuthenticated = false;
 
 void Networking_Init()
 {
@@ -14,7 +14,7 @@ void Networking_GetApiToken()
     HTTPRequest request = new HTTPRequest("https://api.hvh.gg/auth/token/session");
     request.SetHeader("Authorization", "Bearer %s", g_HvHggToken);
     request.SetHeader("Server-IP", "%s:%s", g_ServerIp, g_ServerPort);
-    request.Get(OnGetApiToken);
+    request.Post(new JSONObject(), OnGetApiToken);
 }
 
 void Networking_OnRoundEnd()
@@ -55,11 +55,11 @@ void Networking_OnRoundEnd()
 
 void OnGetApiToken(HTTPResponse response, any value)
 {
-    PrintToServer("[HvH.gg] Authentication successful.");
-
     if (response.Status != HTTPStatus_OK) {
         return;
     }
+
+    PrintToServer("[HvH.gg] Authentication successful.");
 
     JSONObject apiToken = view_as<JSONObject>(response.Data);
     g_bAuthenticated = true;

@@ -39,7 +39,6 @@ public void OnPluginStart()
     LoadConfig();
 
     // init plugins stuff
-    Networking_Init();
     Events_Init();
     Stats_Init();
 
@@ -67,6 +66,8 @@ public OnConfigsExecuted()
     SteamWorks_GetPublicIP(octets);
     Format(g_ServerIp, 16, "%d.%d.%d.%d", octets[0], octets[1], octets[2], octets[3]);
     PrintToServer("ip = %s, port = %s", g_ServerIp, g_ServerPort);
+
+    Networking_Init();
 }
 
 public void OnClientPutInServer(int client)
