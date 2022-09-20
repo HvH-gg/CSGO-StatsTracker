@@ -114,7 +114,7 @@ void Stats_OnHostageEvent(Event event, const char[] name)
 void Stats_OnRoundStart(Event event, const char[] name)
 {
     Networking_OnRoundStart();
-    PrintToServer("[HvH.gg] New round started.");
+    PrintToServer("[HvH.gg] Handling %s.", name);
     g_RoundEvents = new JSONArray();
     g_RoundPlayers = new JSONArray();
     g_EventNumber = 0;

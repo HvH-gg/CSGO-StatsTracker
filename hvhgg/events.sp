@@ -30,12 +30,13 @@ void Events_Init()
 
 public void Match_Start(Event event, const char[] name, bool dB)
 {
-    if (!g_CollectEvents) return;
+    g_CollectEvents = true;
 }
 
 public void Match_End(Event event, const char[] name, bool dB)
 {
-    if (!g_CollectEvents) return;
+    g_CollectEvents = false;
+    Stats_OnRoundStart(event, name);
 }
 
 public void Bot_Takeover(Event event, const char[] name, bool dB)
