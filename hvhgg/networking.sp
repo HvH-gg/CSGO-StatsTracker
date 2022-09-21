@@ -36,7 +36,7 @@ void Networking_OnRoundStart()
             p.UserId = i;
             p.SetUsername(g_PlayerStats[i].Username);
             p.SetSteamId(g_PlayerStats[i].SteamId);
-            p.TeamId = g_PlayerStats[i].TeamId;
+            p.TeamId = GetClientTeam(i);
             p.TimeOnline = g_PlayerStats[i].TimeOnline;
             p.ConnectTime = g_PlayerStats[i].ConnectTime;
             
