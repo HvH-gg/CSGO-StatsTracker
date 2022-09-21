@@ -1,6 +1,7 @@
 char g_HvHggToken[512] = "some-token";
 char g_ApiKey[512] = "some-token";
 bool g_bAuthenticated = false;
+bool g_bStartedAuthentication = false;
 
 void Networking_Init()
 {
@@ -9,8 +10,11 @@ void Networking_Init()
 
 void Networking_GetApiToken()
 {
-    if (g_bAuthenticated) return;
+    if (g_bAuthenticated || g_bStartedAuthentication) return;
+    
+    g_bStartedAuthentication = true;
     PrintToServer("[HvH.gg] Starting authentication.")
+    
     HTTPRequest request = new HTTPRequest("https://api.hvh.gg/auth/token/session");
     request.SetHeader("Authorization", "Bearer %s", g_HvHggToken);
     request.SetHeader("Server-IP", "%s:%s", g_ServerIp, g_ServerPort);
