@@ -67,6 +67,7 @@ void OnGetApiToken(HTTPResponse response, any value)
 
     JSONObject apiToken = view_as<JSONObject>(response.Data);
     g_bAuthenticated = true;
+    g_bStartedAuthentication = false;
     apiToken.GetString("apiToken", g_ApiKey, sizeof(g_ApiKey));
 }
 

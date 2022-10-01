@@ -44,7 +44,7 @@ public void OnPluginStart()
 
     // late load handler
     if (hvh_lateload) {
-        OnConfigsExecuted();
+        GetServerIP();
         PrintToServer("[HvH.gg] Plugin late load detected.");
         LOOP_CLIENTS(i) {
             if (IsPlayer(i) && IsPlayerAlive(i) && GetClientTeam(i) > CS_TEAM_SPECTATOR) {
@@ -52,20 +52,28 @@ public void OnPluginStart()
             }
         }
     }
+    else
+        CreateTimer(10.0, GetServerIPTimer);
 
     PrintToServer("[HvH.gg] Stats tracker initialized.");
     // show ad every 10 minutes
     CreateTimer(600.0, Advertising, _, TIMER_REPEAT);
 }
 
-public OnConfigsExecuted()
+public Action GetServerIPTimer(Handle timer)
+{
+    GetServerIP();
+    return Plugin_Handled;
+}
+
+public GetServerIP()
 {
     GetConVarString(FindConVar("hostport"), g_ServerPort, sizeof(g_ServerPort));
 
     int octets[4];
     SteamWorks_GetPublicIP(octets);
     Format(g_ServerIp, 16, "%d.%d.%d.%d", octets[0], octets[1], octets[2], octets[3]);
-    PrintToServer("ip = %s, port = %s", g_ServerIp, g_ServerPort);
+    PrintToServer("[HvH.gg] Starting on server %s:%s", g_ServerIp, g_ServerPort);
 
     Networking_Init();
 }
