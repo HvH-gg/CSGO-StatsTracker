@@ -30,6 +30,22 @@ void Stats_OnClientPutInServer(int client)
 
 void Stats_OnClientDisconnect(int client)
 {
+    char name[] = "client_disconnect";
+    
+    // create required kvPair
+    JSONArray kvPairs = new JSONArray();
+
+    // get int value from event and transform to string
+    char userid[10];
+    IntToString(client, userid, sizeof(userid));
+
+    // add to array
+    kvPairs.Push(CreateKvPair("userid", userid));
+
+    Stats_BuildEvent(name, kvPairs);
+
+    delete kvPairs;
+
     g_PlayerStats[client].Reset();
 }
 
