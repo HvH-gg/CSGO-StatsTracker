@@ -19,7 +19,7 @@ void Events_Init()
 
     HookEvent("weapon_fire", Weapon_Fire);
 
-    HookEvent("player_spawned", Player_Spawned);
+    HookEvent("player_spawn", Player_Spawned);
     HookEvent("player_hurt", Player_Hurt);
     HookEvent("player_death", Player_Death);
 
