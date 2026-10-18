@@ -22,6 +22,8 @@ void Events_Init()
     HookEvent("player_spawn", Player_Spawned);
     HookEvent("player_hurt", Player_Hurt);
     HookEvent("player_death", Player_Death);
+    // pre, the client is still valid there and the event carries the reason
+    HookEvent("player_disconnect", Player_Disconnect, EventHookMode_Pre);
 
     HookEvent("round_mvp", Round_Mvp);
     HookEvent("round_start", Round_Start);
@@ -30,13 +32,13 @@ void Events_Init()
 
 public void Match_Start(Event event, const char[] name, bool dB)
 {
-    g_CollectEvents = true;
+    Stats_OnMatchStart();
 }
 
 public void Match_End(Event event, const char[] name, bool dB)
 {
-    g_CollectEvents = false;
-    Stats_OnRoundStart(event, name);
+    if (!g_CollectEvents) return;
+    Stats_OnMatchEnd(event, name);
 }
 
 public void Bot_Takeover(Event event, const char[] name, bool dB)
@@ -85,6 +87,13 @@ public void Player_Death(Event event, const char[] name, bool dB)
 {
     if (!g_CollectEvents) return;
     Stats_OnPlayerDeath(event, name);
+}
+
+public Action Player_Disconnect(Event event, const char[] name, bool dB)
+{
+    if (g_CollectEvents)
+        Stats_OnPlayerDisconnect(event);
+    return Plugin_Continue;
 }
 
 public void Round_Mvp(Event event, const char[] name, bool dB)

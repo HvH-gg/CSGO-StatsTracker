@@ -1,14 +1,86 @@
 #include <cstrike>
+#include <sdktools>
 
 #define LOOP_CLIENTS(%1) for (int %1 = 1; %1 <= MaxClients; %1 ++)
 
-stock EventKvPair CreateKvPair(const char[] key, const char[] value)
+// Appends a { "key": ..., "value": ... } entry. The local handle is released again
+// because pushing into the array keeps its own reference.
+stock void PushKv(JSONArray array, const char[] key, const char[] value)
 {
     EventKvPair kvp = new EventKvPair();
     kvp.SetKey(key);
     kvp.SetValue(value);
 
-    return kvp;
+    array.Push(kvp);
+
+    delete kvp;
+}
+
+stock void PushKvInt(JSONArray array, const char[] key, int value)
+{
+    char buffer[16];
+    IntToString(value, buffer, sizeof(buffer));
+
+    PushKv(array, key, buffer);
+}
+
+// The backend prepends "weapon_" itself, so the prefix has to be stripped here.
+stock void StripWeaponPrefix(char[] weapon, int maxlength)
+{
+    if (StrContains(weapon, "weapon_") != 0)
+        return;
+
+    char stripped[64];
+    strcopy(stripped, sizeof(stripped), weapon[7]);
+    strcopy(weapon, maxlength, stripped);
+}
+
+// Weapon names as sent to the backend, i.e. without the "weapon_" prefix.
+stock bool IsUtilityWeapon(const char[] weapon)
+{
+    return StrEqual(weapon, "hegrenade") || StrEqual(weapon, "inferno") ||
+           StrEqual(weapon, "molotov") || StrEqual(weapon, "incgrenade") ||
+           StrEqual(weapon, "flashbang") || StrEqual(weapon, "smokegrenade") ||
+           StrEqual(weapon, "decoy");
+}
+
+stock bool IsWarmupPeriod()
+{
+    return GameRules_GetProp("m_bWarmupPeriod") != 0;
+}
+
+// Same team and not FFA (mp_teammates_are_enemies), i.e. damage between them is friendly fire.
+stock bool AreTeammates(int a, int b)
+{
+    ConVar ffa = FindConVar("mp_teammates_are_enemies");
+    if (ffa != null && ffa.BoolValue)
+        return false;
+
+    return GetClientTeam(a) == GetClientTeam(b);
+}
+
+// Seconds left until detonation, -1.0 while no bomb is planted (same as the CS2 tracker).
+stock float GetBombTimer()
+{
+    int c4 = FindEntityByClassname(-1, "planted_c4");
+    if (c4 == -1)
+        return -1.0;
+
+    float remaining = GetEntPropFloat(c4, Prop_Send, "m_flC4Blow") - GetGameTime();
+
+    return remaining > 0.0 ? remaining : 0.0;
+}
+
+// Seconds left until the running defuse finishes, -1.0 while nobody defuses.
+stock float GetBombDefuseTime()
+{
+    int c4 = FindEntityByClassname(-1, "planted_c4");
+    if (c4 == -1 || !GetEntProp(c4, Prop_Send, "m_bBeingDefused"))
+        return -1.0;
+
+    float remaining = GetEntPropFloat(c4, Prop_Send, "m_flDefuseCountDown") - GetGameTime();
+
+    return remaining > 0.0 ? remaining : 0.0;
 }
 
 stock int CountAlivePlayersOnTeam(int csTeam) {

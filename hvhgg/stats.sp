@@ -2,10 +2,38 @@ void Stats_Init()
 {
     LOOP_CLIENTS(i)
         g_PlayerStats[i].Reset();
+
+    Stats_NewMatchId();
 }
 
-void Stats_OnClientPutInServer(int client)
+// "unixtime|map". No ip (matches are always looked up per server) and the plain map name,
+// so workshop paths cannot push the timestamp out of the 64 characters the backend keeps.
+void Stats_NewMatchId()
 {
+    char map[PLATFORM_MAX_PATH];
+    char displayName[64];
+    GetCurrentMap(map, sizeof(map));
+    if (!GetMapDisplayName(map, displayName, sizeof(displayName)))
+        strcopy(displayName, sizeof(displayName), map);
+
+    Format(g_MatchId, sizeof(g_MatchId), "%d|%s", GetTime(), displayName);
+}
+
+void Stats_OnMatchStart()
+{
+    g_CollectEvents = true;
+    Stats_NewMatchId();
+
+    LOOP_CLIENTS(i)
+        g_PlayerStats[i].ResetStats();
+}
+
+// Registers a human once it is in game and authorized (both forwards call this, the second one wins).
+void Stats_TryRegisterClient(int client)
+{
+    if (!IsPlayer(client) || !IsClientAuthorized(client) || g_PlayerStats[client].Connected)
+        return;
+
     // get steamId
     char sID[32];
     if (!GetClientAuthId(client, AuthId_SteamID64, sID, sizeof(sID)))
@@ -19,47 +47,70 @@ void Stats_OnClientPutInServer(int client)
     // save steamId
     g_PlayerStats[client].SteamId = sID;
 
-    // save playtime data
+    g_PlayerStats[client].Connected = true;
     g_PlayerStats[client].TeamId = GetClientTeam(client);
     g_PlayerStats[client].ConnectTime = GetTickedTime();
     g_PlayerStats[client].SpawnTime = GetTickedTime();
-    g_PlayerStats[client].TimeOnline = 0.0;
+    g_PlayerStats[client].LastHealth = GetClientHealth(client);
 
     PrintToServer("[HvH.gg] Player %s (%s) connected.", g_PlayerStats[client].Username, g_PlayerStats[client].SteamId);
+
+    if (!g_CollectEvents)
+        return;
+
+    // the backend replays connects into the round it is emulating
+    JSONArray kvPairs = new JSONArray();
+    PushKvInt(kvPairs, "userid", client);
+    PushKv(kvPairs, "steamid", sID);
+    PushKvInt(kvPairs, "teamid", GetClientTeam(client));
+
+    Stats_BuildEvent("player_connect", kvPairs);
+
+    delete kvPairs;
+}
+
+static void BuildDisconnectEvent(int client, const char[] reason)
+{
+    JSONArray kvPairs = new JSONArray();
+    PushKvInt(kvPairs, "userid", client);
+    PushKvInt(kvPairs, "teamid", IsClientInGame(client) ? GetClientTeam(client) : g_PlayerStats[client].TeamId);
+    PushKv(kvPairs, "steamid", g_PlayerStats[client].SteamId);
+    PushKv(kvPairs, "reason", reason);
+
+    Stats_BuildEvent("player_disconnect", kvPairs);
+
+    delete kvPairs;
+}
+
+// The event carries the reason, OnClientDisconnect below covers the case where it does not fire first.
+void Stats_OnPlayerDisconnect(Event event)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (!IsEntityClient(client) || !g_PlayerStats[client].Connected || g_PlayerStats[client].DisconnectReported)
+        return;
+
+    char reason[64];
+    event.GetString("reason", reason, sizeof(reason));
+
+    BuildDisconnectEvent(client, reason);
+    g_PlayerStats[client].DisconnectReported = true;
 }
 
 void Stats_OnClientDisconnect(int client)
 {
-    char name[] = "client_disconnect";
-    
-    // create required kvPair
-    JSONArray kvPairs = new JSONArray();
-
-    // get int value from event and transform to string
-    char userid[10];
-    IntToString(client, userid, sizeof(userid));
-
-    // add to array
-    kvPairs.Push(CreateKvPair("userid", userid));
-
-    Stats_BuildEvent(name, kvPairs);
-
-    delete kvPairs;
+    if (g_CollectEvents && g_PlayerStats[client].Connected && !g_PlayerStats[client].DisconnectReported)
+        BuildDisconnectEvent(client, "");
 
     g_PlayerStats[client].Reset();
 }
 
 void Stats_OnBotTakeover(Event event, const char[] name)
 {
-    // create required kvPair
     JSONArray kvPairs = new JSONArray();
 
-    // get int value from event and transform to string
-    char userid[10];
-    IntToString(GetClientOfUserId(event.GetInt("userid")), userid, sizeof(userid));
-
-    // add to array
-    kvPairs.Push(CreateKvPair("userid", userid));
+    PushKvInt(kvPairs, "userid", GetClientOfUserId(event.GetInt("userid")));
+    // the bot whose body is taken over, the backend stops counting it as alive
+    PushKvInt(kvPairs, "botid", GetClientOfUserId(event.GetInt("botid")));
 
     Stats_BuildEvent(name, kvPairs);
 
@@ -68,22 +119,16 @@ void Stats_OnBotTakeover(Event event, const char[] name)
 
 void Stats_OnItemPurchase(Event event, const char[] name)
 {
-    // create required kvPair
     JSONArray kvPairs = new JSONArray();
-
-    // get int value from event and transform to string
-    char userid[10];
-    char team[10];
-    IntToString(GetClientOfUserId(event.GetInt("userid")), userid, sizeof(userid));
-    IntToString(GetClientOfUserId(event.GetInt("team")), team, sizeof(team));
 
     char weapon[32];
     event.GetString("weapon", weapon, sizeof(weapon));
+    StripWeaponPrefix(weapon, sizeof(weapon));
 
-    // add to array
-    kvPairs.Push(CreateKvPair("userid", userid));
-    kvPairs.Push(CreateKvPair("team", team));
-    kvPairs.Push(CreateKvPair("weapon", weapon));
+    PushKvInt(kvPairs, "userid", GetClientOfUserId(event.GetInt("userid")));
+    // "team" is already a team id, not a user id
+    PushKvInt(kvPairs, "team", event.GetInt("team"));
+    PushKv(kvPairs, "weapon", weapon);
 
     Stats_BuildEvent(name, kvPairs);
 
@@ -92,18 +137,10 @@ void Stats_OnItemPurchase(Event event, const char[] name)
 
 void Stats_OnBombEvent(Event event, const char[] name)
 {
-    // create required kvPair
     JSONArray kvPairs = new JSONArray();
 
-    // get int value from event and transform to string
-    char userid[10];
-    IntToString(GetClientOfUserId(event.GetInt("userid")), userid, sizeof(userid));
-    char site[10];
-    IntToString(event.GetInt("site"), site, sizeof(site));
-
-    // add to array
-    kvPairs.Push(CreateKvPair("userid", userid));
-    kvPairs.Push(CreateKvPair("site", site));
+    PushKvInt(kvPairs, "userid", GetClientOfUserId(event.GetInt("userid")));
+    PushKvInt(kvPairs, "site", event.GetInt("site"));
 
     Stats_BuildEvent(name, kvPairs);
 
@@ -112,15 +149,11 @@ void Stats_OnBombEvent(Event event, const char[] name)
 
 void Stats_OnHostageEvent(Event event, const char[] name)
 {
-    // create required kvPair
     JSONArray kvPairs = new JSONArray();
 
-    // get int value from event and transform to string
-    char userid[10];
-    IntToString(GetClientOfUserId(event.GetInt("userid")), userid, sizeof(userid));
-
-    // add to array
-    kvPairs.Push(CreateKvPair("userid", userid));
+    PushKvInt(kvPairs, "userid", GetClientOfUserId(event.GetInt("userid")));
+    // "hostage" is an entity index, not a user id
+    PushKvInt(kvPairs, "hostage", event.GetInt("hostage"));
 
     Stats_BuildEvent(name, kvPairs);
 
@@ -129,151 +162,190 @@ void Stats_OnHostageEvent(Event event, const char[] name)
 
 void Stats_OnRoundStart(Event event, const char[] name)
 {
-    Networking_OnRoundStart();
+    // flush the round that just finished before starting a new buffer
+    Networking_SendRound();
+
     PrintToServer("[HvH.gg] Handling %s.", name);
+
+    delete g_RoundEvents;
+    delete g_RoundPlayers;
+
     g_RoundEvents = new JSONArray();
     g_RoundPlayers = new JSONArray();
     g_EventNumber = 0;
+    g_RoundClosed = false;
+
+    GetCurrentMap(g_RoundMap, sizeof(g_RoundMap));
+
+    // snapshot of the players the round is emulated with; bots are included so the backend
+    // knows who is alive, it never credits them
+    LOOP_CLIENTS(i) {
+        if (!IsValidClient(i) || GetClientTeam(i) <= CS_TEAM_SPECTATOR)
+            continue;
+
+        bool isBot = IsFakeClient(i);
+        if (!isBot && g_PlayerStats[i].SteamId[0] == '\0')
+            continue;
+
+        PlayerInfo p = new PlayerInfo();
+        p.UserId = i;
+        p.SetSteamId(isBot ? "BOT" : g_PlayerStats[i].SteamId);
+        p.TeamId = GetClientTeam(i);
+        p.CheatId = 0;
+        p.IsBot = isBot;
+
+        g_RoundPlayers.Push(p);
+        delete p;
+    }
+
+    JSONArray kvPairs = new JSONArray();
+    Stats_BuildEvent("round_start", kvPairs);
+    delete kvPairs;
 }
 
 void Stats_OnPlayerSpawned(Event event, const char[] name)
 {
-    int userid = GetClientOfUserId(event.GetInt("userid"));
+    int client = GetClientOfUserId(event.GetInt("userid"));
 
-    if (IsPlayer(userid) && GetClientTeam(userid) > CS_TEAM_SPECTATOR) {
-        PrintToServer("[HvH.gg] Updating player %i.", userid);
-        g_PlayerStats[userid].TeamId = GetClientTeam(userid);
-        g_PlayerStats[userid].SpawnTime = GetTickedTime();
-    }
+    if (!IsValidClient(client) || GetClientTeam(client) <= CS_TEAM_SPECTATOR)
+        return;
+
+    g_PlayerStats[client].TeamId = GetClientTeam(client);
+    g_PlayerStats[client].SpawnTime = GetTickedTime();
+    g_PlayerStats[client].LastHealth = GetClientHealth(client);
+
+    JSONArray kvPairs = new JSONArray();
+    PushKvInt(kvPairs, "userid", client);
+
+    Stats_BuildEvent("player_spawn", kvPairs);
+
+    delete kvPairs;
 }
 
 void Stats_OnWeaponFire(Event event, const char[] name)
 {
-    // create required kvPair
     JSONArray kvPairs = new JSONArray();
-
-    // get int value from event and transform to string
-    char userid[10];
-    IntToString(GetClientOfUserId(event.GetInt("userid")), userid, sizeof(userid));
-    kvPairs.Push(CreateKvPair("userid", userid));
 
     char weapon[32];
     event.GetString("weapon", weapon, sizeof(weapon));
-    kvPairs.Push(CreateKvPair("weapon", weapon));
+    StripWeaponPrefix(weapon, sizeof(weapon));
+
+    PushKvInt(kvPairs, "userid", GetClientOfUserId(event.GetInt("userid")));
+    PushKv(kvPairs, "weapon", weapon);
 
     Stats_BuildEvent(name, kvPairs);
+
     delete kvPairs;
+}
+
+static void PushPosition(JSONArray kvPairs, const char[] prefix, int client)
+{
+    if (!IsValidClient(client))
+        return;
+
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+
+    char key[32];
+    char value[16];
+    char axisNames[] = "xyz";
+
+    for (int axis = 0; axis < 3; axis++) {
+        Format(key, sizeof(key), "%s_%c", prefix, axisNames[axis]);
+        FloatToString(pos[axis], value, sizeof(value));
+        PushKv(kvPairs, key, value);
+    }
 }
 
 void Stats_OnPlayerDeath(Event event, const char[] name)
 {
-    // create required kvPair
-    JSONArray kvPairs = new JSONArray();
-
-    // get int value from event and transform to string
-    int userId = GetClientOfUserId(event.GetInt("userid"));
+    int victimId = GetClientOfUserId(event.GetInt("userid"));
     int attackerId = GetClientOfUserId(event.GetInt("attacker"));
     int assisterId = GetClientOfUserId(event.GetInt("assister"));
-
-    char userid[10];
-    char attacker[10];
-    char assister[10];
-    IntToString(userId, userid, sizeof(userid));
-    IntToString(attackerId, attacker, sizeof(attacker));
-    IntToString(assisterId, assister, sizeof(assister));
-
-    if (IsPlayer(userId)) {
-        char x[10], y[10], z[10];
-        float pos[3];
-        GetClientAbsOrigin(userId, pos);
-        FloatToString(pos[0], x, sizeof(x));
-        FloatToString(pos[1], y, sizeof(y));
-        FloatToString(pos[1], z, sizeof(z));
-        kvPairs.Push(CreateKvPair("userid_x", x));
-        kvPairs.Push(CreateKvPair("userid_y", y));
-        kvPairs.Push(CreateKvPair("userid_z", z));
-    }
-    if (IsPlayer(attackerId)) {
-        char x[10], y[10], z[10];
-        float pos[3];
-        GetClientAbsOrigin(attackerId, pos);
-        FloatToString(pos[0], x, sizeof(x));
-        FloatToString(pos[1], y, sizeof(y));
-        FloatToString(pos[2], z, sizeof(z));
-        kvPairs.Push(CreateKvPair("attacker_x", x));
-        kvPairs.Push(CreateKvPair("attacker_y", y));
-        kvPairs.Push(CreateKvPair("attacker_z", z));
-    }
-    if (IsPlayer(assisterId)) {
-        char x[10], y[10], z[10];
-        float pos[3];
-        GetClientAbsOrigin(assisterId, pos);
-        FloatToString(pos[0], x, sizeof(x));
-        FloatToString(pos[1], y, sizeof(y));
-        FloatToString(pos[2], z, sizeof(z));
-        kvPairs.Push(CreateKvPair("assister_x", x));
-        kvPairs.Push(CreateKvPair("assister_y", y));
-        kvPairs.Push(CreateKvPair("assister_z", z));
-    }
-
-    // add to array
-    kvPairs.Push(CreateKvPair("userid", userid));
-    kvPairs.Push(CreateKvPair("attacker", attacker));
-    kvPairs.Push(CreateKvPair("assister", assister));
-
-    kvPairs.Push(CreateKvPair("headshot", event.GetBool("headshot") ? "true" : "false"));
+    bool headshot = event.GetBool("headshot");
 
     char weapon[32];
     event.GetString("weapon", weapon, sizeof(weapon));
-    kvPairs.Push(CreateKvPair("weapon", weapon));
+    StripWeaponPrefix(weapon, sizeof(weapon));
+
+    // CSGO has no attackerinair field, CS2 does
+    bool attackerInAir = IsValidClient(attackerId) && !(GetEntityFlags(attackerId) & FL_ONGROUND);
+
+    JSONArray kvPairs = new JSONArray();
+
+    PushPosition(kvPairs, "userid", victimId);
+    PushPosition(kvPairs, "attacker", attackerId);
+    PushPosition(kvPairs, "assister", assisterId);
+
+    PushKvInt(kvPairs, "userid", victimId);
+    PushKvInt(kvPairs, "attacker", attackerId);
+    PushKvInt(kvPairs, "assister", assisterId);
+    PushKv(kvPairs, "weapon", weapon);
+    PushKv(kvPairs, "headshot", headshot ? "true" : "false");
+    PushKv(kvPairs, "penetrated", event.GetInt("penetrated") > 0 ? "true" : "false");
+    PushKv(kvPairs, "attackerinair", attackerInAir ? "true" : "false");
+    PushKv(kvPairs, "noscope", event.GetBool("noscope") ? "true" : "false");
 
     Stats_BuildEvent(name, kvPairs);
 
     delete kvPairs;
+
+    // fallback headshot total, only enemy kills count
+    if (headshot && IsPlayer(attackerId) && IsValidClient(victimId) && attackerId != victimId &&
+        !AreTeammates(attackerId, victimId))
+        g_PlayerStats[attackerId].Headshots++;
 }
 
 void Stats_OnPlayerHurt(Event event, const char[] name)
 {
-    // create required kvPair
-    JSONArray kvPairs = new JSONArray();
-
-    // get int value from event and transform to string
-    char userid[10];
-    char attacker[10];
-    char hitgroup[10];
-    IntToString(GetClientOfUserId(event.GetInt("userid")), userid, sizeof(userid));
-    IntToString(GetClientOfUserId(event.GetInt("attacker")), attacker, sizeof(attacker));
-    IntToString(GetClientOfUserId(event.GetInt("hitgroup")), hitgroup, sizeof(hitgroup));
-
-    // add to array
-    kvPairs.Push(CreateKvPair("userid", userid));
-    kvPairs.Push(CreateKvPair("attacker", attacker));
-    kvPairs.Push(CreateKvPair("hitgroup", hitgroup));
-
-    char dmg_health[10];
-    IntToString(event.GetInt("dmg_health"), dmg_health, sizeof(dmg_health));
-    kvPairs.Push(CreateKvPair("dmg_health", dmg_health));
+    int victimId = GetClientOfUserId(event.GetInt("userid"));
+    int attackerId = GetClientOfUserId(event.GetInt("attacker"));
+    int damage = event.GetInt("dmg_health");
+    int health = event.GetInt("health");
 
     char weapon[32];
     event.GetString("weapon", weapon, sizeof(weapon));
-    kvPairs.Push(CreateKvPair("weapon", weapon));
+    StripWeaponPrefix(weapon, sizeof(weapon));
+
+    JSONArray kvPairs = new JSONArray();
+
+    PushPosition(kvPairs, "userid", victimId);
+    PushPosition(kvPairs, "attacker", attackerId);
+
+    PushKvInt(kvPairs, "userid", victimId);
+    PushKvInt(kvPairs, "attacker", attackerId);
+    PushKvInt(kvPairs, "health", health);
+    PushKvInt(kvPairs, "armor", event.GetInt("armor"));
+    // "hitgroup" is a hitgroup id, not a user id
+    PushKvInt(kvPairs, "hitgroup", event.GetInt("hitgroup"));
+    PushKv(kvPairs, "weapon", weapon);
+    PushKvInt(kvPairs, "dmg_health", damage);
 
     Stats_BuildEvent(name, kvPairs);
 
     delete kvPairs;
+
+    if (!IsValidClient(victimId))
+        return;
+
+    // dmg_health is not capped at the health the victim had left, the fallback total is
+    int dealt = damage < g_PlayerStats[victimId].LastHealth ? damage : g_PlayerStats[victimId].LastHealth;
+    g_PlayerStats[victimId].LastHealth = health;
+
+    if (!IsPlayer(attackerId) || attackerId == victimId || AreTeammates(attackerId, victimId))
+        return;
+
+    g_PlayerStats[attackerId].Damage += dealt;
+    if (IsUtilityWeapon(weapon))
+        g_PlayerStats[attackerId].UtilityDamage += dealt;
 }
 
 void Stats_OnRoundMvp(Event event, const char[] name)
 {
-    // create required kvPair
     JSONArray kvPairs = new JSONArray();
 
-    // get int value from event and transform to string
-    char userid[10];
-    IntToString(GetClientOfUserId(event.GetInt("userid")), userid, sizeof(userid));
-
-    // add to array
-    kvPairs.Push(CreateKvPair("userid", userid));
+    PushKvInt(kvPairs, "userid", GetClientOfUserId(event.GetInt("userid")));
+    PushKvInt(kvPairs, "reason", event.GetInt("reason"));
 
     Stats_BuildEvent(name, kvPairs);
 
@@ -282,43 +354,46 @@ void Stats_OnRoundMvp(Event event, const char[] name)
 
 void Stats_OnRoundEnd(Event event, const char[] name)
 {
-    LOOP_CLIENTS(i) {
-		if (IsPlayer(i) && GetClientTeam(i) > CS_TEAM_SPECTATOR && g_PlayerStats[i].SpawnTime > 0.0) {
-            // record time online
-			g_PlayerStats[i].TimeOnline = GetTickedTime() - g_PlayerStats[i].SpawnTime;
-        }
-    }
-
-    // create required kvPair
     JSONArray kvPairs = new JSONArray();
 
-    // get int value from event and transform to string
-    char winner[10];
-    char reason[10];
-    IntToString(event.GetInt("winner"), winner, sizeof(winner));
-    IntToString(event.GetInt("reason"), reason, sizeof(reason));
-
-    // add to array
-    kvPairs.Push(CreateKvPair("winner", winner));
-    kvPairs.Push(CreateKvPair("reason", reason));
+    PushKvInt(kvPairs, "winner", event.GetInt("winner"));
+    PushKvInt(kvPairs, "reason", event.GetInt("reason"));
 
     Stats_BuildEvent(name, kvPairs);
 
     delete kvPairs;
+
+    g_RoundClosed = true;
+}
+
+void Stats_OnMatchEnd(Event event, const char[] name)
+{
+    JSONArray kvPairs = new JSONArray();
+    Stats_BuildEvent("cs_win_panel_match", kvPairs);
+    delete kvPairs;
+
+    // flush what is buffered, the next round_start may never arrive
+    Networking_SendRound();
+    g_RoundClosed = false;
+
+    g_CollectEvents = false;
 }
 
 void Stats_BuildEvent(const char[] name, JSONArray kvPairs)
 {
-    // json body
+    if (g_RoundEvents == null)
+        return;
+
     JSONObject body = new JSONObject();
     body.SetInt("id", g_EventNumber);
     body.SetString("name", name);
-    body.SetFloat("time", GetTickedTime());
+    body.SetInt("serverTick", GetGameTickCount());
+    body.SetBool("isWarmup", IsWarmupPeriod());
+    body.SetFloat("bombTimer", GetBombTimer());
+    body.SetFloat("bombDefuseTime", GetBombDefuseTime());
 
-    // add array to body
     body.Set("kvPairs", kvPairs);
 
-    // add event to round events
     g_RoundEvents.Push(body);
     g_EventNumber++;
 
