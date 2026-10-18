@@ -1,0 +1,120 @@
+name: Build & Publish
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - 'README.MD'
+  workflow_dispatch:
+
+env:
+  SM_BRANCH: '1.12'
+  RIPEXT_VERSION: '1.3.2'
+  STEAMWORKS_BUILD: 'git132'
+  # the include shipped with the git132 builds is from 2018 and does not compile with SourceMod 1.12
+  STEAMWORKS_INC_SHA: 'f0c1b62dff615511b27824aaa2815c7dc58d2716'
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
+      exists: ${{ steps.check_version.outputs.exists }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version number from README.MD
+        id: extract_version
+        run: |
+          VERSION=$(grep -oP '(?<=# \[HvH\.gg\]\(https:\/\/hvh\.gg\) CSGO Stats Tracker \()[0-9]+\.[0-9]+\.[0-9]+' README.MD)
+          if [ -z "$VERSION" ]; then
+            echo "No version number found in README.MD. Exiting."
+            exit 1
+          fi
+          if ! grep -qP "version\s*=\s*\"v${VERSION//./\\.}\"" stats_tracker.sp; then
+            echo "myinfo version in stats_tracker.sp does not match v$VERSION from README.MD. Exiting."
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if version already exists
+        id: check_version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "v${{ steps.extract_version.outputs.version }}" > /dev/null 2>&1; then
+            echo "Version ${{ steps.extract_version.outputs.version }} already exists. Skipping build."
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.exists != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION_NUMBER: ${{ needs.check-version.outputs.version }}
+    steps:
+      - name: Prepare env
+        shell: bash
+        run: echo "GITHUB_SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download SourceMod ${{ env.SM_BRANCH }}
+        run: |
+          SM_FILE=$(curl -sSf "https://sm.alliedmods.net/smdrop/$SM_BRANCH/sourcemod-latest-linux")
+          echo "Using $SM_FILE"
+          mkdir -p deps/sourcemod
+          curl -sSfL "https://sm.alliedmods.net/smdrop/$SM_BRANCH/$SM_FILE" | tar xz -C deps/sourcemod
+
+      - name: Download dependencies
+        run: |
+          mkdir -p deps/linux deps/windows deps/include
+          curl -sSfLo deps/ripext-linux.zip "https://github.com/ErikMinekus/sm-ripext/releases/download/$RIPEXT_VERSION/sm-ripext-$RIPEXT_VERSION-linux.zip"
+          curl -sSfLo deps/ripext-windows.zip "https://github.com/ErikMinekus/sm-ripext/releases/download/$RIPEXT_VERSION/sm-ripext-$RIPEXT_VERSION-windows.zip"
+          curl -sSfLo deps/steamworks-linux.tar.gz "https://users.alliedmods.net/~kyles/builds/SteamWorks/SteamWorks-$STEAMWORKS_BUILD-linux.tar.gz"
+          curl -sSfLo deps/steamworks-windows.zip "https://users.alliedmods.net/~kyles/builds/SteamWorks/SteamWorks-$STEAMWORKS_BUILD-windows.zip"
+          unzip -q deps/ripext-linux.zip -d deps/linux
+          unzip -q deps/ripext-windows.zip -d deps/windows
+          tar xzf deps/steamworks-linux.tar.gz -C deps/linux
+          unzip -q deps/steamworks-windows.zip -d deps/windows
+          cp -r deps/linux/addons/sourcemod/scripting/include/ripext deps/linux/addons/sourcemod/scripting/include/ripext.inc deps/include/
+          curl -sSfLo deps/include/SteamWorks.inc "https://raw.githubusercontent.com/KyleSanderson/SteamWorks/$STEAMWORKS_INC_SHA/Pawn/includes/SteamWorks.inc"
+
+      - name: Compile plugin
+        run: |
+          SCRIPTING=deps/sourcemod/addons/sourcemod/scripting
+          chmod +x $SCRIPTING/spcomp
+          $SCRIPTING/spcomp stats_tracker.sp -i$SCRIPTING/include -ideps/include -i. -ostats_tracker.smx
+          test -f stats_tracker.smx
+
+      - name: Create release zips
+        run: |
+          for platform in linux windows; do
+            OUT=release/$platform/addons/sourcemod
+            mkdir -p $OUT/plugins $OUT/configs $OUT/extensions
+            cp stats_tracker.smx $OUT/plugins/
+            cp configs/stats_tracker.cfg $OUT/configs/
+            cp -r deps/$platform/addons/sourcemod/extensions/. $OUT/extensions/
+            cp -r deps/$platform/addons/sourcemod/configs/ripext $OUT/configs/
+            (cd release/$platform && zip -r ../../StatsTracker-CSGO-$VERSION_NUMBER-$GITHUB_SHA_SHORT-$platform.zip addons)
+          done
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          gh release create "v$VERSION_NUMBER" \
+            --title "$VERSION_NUMBER" \
+            --target "$GITHUB_SHA" \
+            --notes "$(printf '## Changes\n- Auto-generated release\n%s\n\nBuilt with SourceMod %s, REST in Pawn %s, SteamWorks %s.' "$COMMIT_MESSAGE" "$SM_BRANCH" "$RIPEXT_VERSION" "$STEAMWORKS_BUILD")" \
+            StatsTracker-CSGO-$VERSION_NUMBER-$GITHUB_SHA_SHORT-linux.zip \
+            StatsTracker-CSGO-$VERSION_NUMBER-$GITHUB_SHA_SHORT-windows.zip
