@@ -1,6 +1,6 @@
 #define HVHGG_DEFAULT_API_URL "https://hvh.gg/api/"
 
-// Per-server stats key, taken from configs/stats_tracker.cfg. The backend resolves the
+// Per-server stats key, taken from configs/CSGO-StatsTracker.cfg. The backend resolves the
 // server from this key, so there is no separate authentication round trip.
 char g_HvHggToken[512] = "";
 

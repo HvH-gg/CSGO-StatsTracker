@@ -1,6 +1,6 @@
 ![Copyright ev0lve Digital](https://img.shields.io/badge/Copyright-ev0lve%20Digital-blue)
 
-# [HvH.gg](https://hvh.gg) CSGO Stats Tracker (0.3.0)
+# [HvH.gg](https://hvh.gg) CSGO Stats Tracker (1.0.0)
 
 Our CSGO Stats tracker plugin enables stats tracking for all players on a server.
 
@@ -13,7 +13,7 @@ Our CSGO Stats tracker plugin enables stats tracking for all players on a server
 2. Download the latest release for your server (`linux` or `windows`)
 3. Place the `addons` folder in your servers `csgo/` directory
 4. Add your API Key in the config file.  
-   4.1. Located at `addons/sourcemod/configs/stats_tracker.cfg`
+   4.1. Located at `addons/sourcemod/configs/CSGO-StatsTracker.cfg`
 5. Restart your server
 
 When updating, keep your existing config file so your API Key is not overwritten.

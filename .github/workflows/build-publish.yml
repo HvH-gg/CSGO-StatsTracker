@@ -33,8 +33,8 @@ jobs:
             echo "No version number found in README.MD. Exiting."
             exit 1
           fi
-          if ! grep -qP "version\s*=\s*\"v${VERSION//./\\.}\"" stats_tracker.sp; then
-            echo "myinfo version in stats_tracker.sp does not match v$VERSION from README.MD. Exiting."
+          if ! grep -qP "version\s*=\s*\"v${VERSION//./\\.}\"" CSGO-StatsTracker.sp; then
+            echo "myinfo version in CSGO-StatsTracker.sp does not match v$VERSION from README.MD. Exiting."
             exit 1
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -92,19 +92,19 @@ jobs:
         run: |
           SCRIPTING=deps/sourcemod/addons/sourcemod/scripting
           chmod +x $SCRIPTING/spcomp
-          $SCRIPTING/spcomp stats_tracker.sp -i$SCRIPTING/include -ideps/include -i. -ostats_tracker.smx
-          test -f stats_tracker.smx
+          $SCRIPTING/spcomp CSGO-StatsTracker.sp -i$SCRIPTING/include -ideps/include -i. -oCSGO-StatsTracker.smx
+          test -f CSGO-StatsTracker.smx
 
       - name: Create release zips
         run: |
           for platform in linux windows; do
             OUT=release/$platform/addons/sourcemod
             mkdir -p $OUT/plugins $OUT/configs $OUT/extensions
-            cp stats_tracker.smx $OUT/plugins/
-            cp configs/stats_tracker.cfg $OUT/configs/
+            cp CSGO-StatsTracker.smx $OUT/plugins/
+            cp configs/CSGO-StatsTracker.cfg $OUT/configs/
             cp -r deps/$platform/addons/sourcemod/extensions/. $OUT/extensions/
             cp -r deps/$platform/addons/sourcemod/configs/ripext $OUT/configs/
-            (cd release/$platform && zip -r ../../StatsTracker-CSGO-$VERSION_NUMBER-$GITHUB_SHA_SHORT-$platform.zip addons)
+            (cd release/$platform && zip -r ../../CSGO-StatsTracker-$VERSION_NUMBER-$GITHUB_SHA_SHORT-$platform.zip addons)
           done
 
       - name: Create GitHub Release
@@ -116,5 +116,5 @@ jobs:
             --title "$VERSION_NUMBER" \
             --target "$GITHUB_SHA" \
             --notes "$(printf '## Changes\n- Auto-generated release\n%s\n\nBuilt with SourceMod %s, REST in Pawn %s, SteamWorks %s.' "$COMMIT_MESSAGE" "$SM_BRANCH" "$RIPEXT_VERSION" "$STEAMWORKS_BUILD")" \
-            StatsTracker-CSGO-$VERSION_NUMBER-$GITHUB_SHA_SHORT-linux.zip \
-            StatsTracker-CSGO-$VERSION_NUMBER-$GITHUB_SHA_SHORT-windows.zip
+            CSGO-StatsTracker-$VERSION_NUMBER-$GITHUB_SHA_SHORT-linux.zip \
+            CSGO-StatsTracker-$VERSION_NUMBER-$GITHUB_SHA_SHORT-windows.zip

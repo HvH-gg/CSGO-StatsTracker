@@ -24,7 +24,7 @@ public Plugin:myinfo =
     name = "HvH.gg - Global stats tracker",
     author = "imi-tat0r",
     description = "Global HvH ranking and statistics by hvh.gg",
-    version = "v0.3.0"
+    version = "v1.0.0"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
@@ -111,7 +111,7 @@ public void OnClientDisconnect(int client)
 void LoadConfig()
 {
     char path[PLATFORM_MAX_PATH];
-    BuildPath(Path_SM, path, sizeof(path), "configs/stats_tracker.cfg");
+    BuildPath(Path_SM, path, sizeof(path), "configs/CSGO-StatsTracker.cfg");
 
     if (!FileExists(path)) {
         SetFailState("[HvH.gg] Configuration file %s does not exist", path);
