@@ -214,8 +214,13 @@ void Stats_OnPlayerSpawned(Event event, const char[] name)
     g_PlayerStats[client].SpawnTime = GetTickedTime();
     g_PlayerStats[client].LastHealth = GetClientHealth(client);
 
+    // who the slot is and the team: a spectator joining a team isn't in the round's player list and sends no
+    // connect, without these the backend can't name him
     JSONArray kvPairs = new JSONArray();
     PushKvInt(kvPairs, "userid", client);
+    if (!IsFakeClient(client) && g_PlayerStats[client].SteamId[0] != '\0')
+        PushKv(kvPairs, "steamid", g_PlayerStats[client].SteamId);
+    PushKvInt(kvPairs, "teamid", GetClientTeam(client));
 
     Stats_BuildEvent("player_spawn", kvPairs);
 
