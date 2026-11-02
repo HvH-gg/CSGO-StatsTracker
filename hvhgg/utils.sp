@@ -71,11 +71,12 @@ stock float GetBombTimer()
     return remaining > 0.0 ? remaining : 0.0;
 }
 
-// Seconds left until the running defuse finishes, -1.0 while nobody defuses.
+// Seconds left until the running defuse finishes, -1.0 while nobody defuses. CS:GO has no m_bBeingDefused (that is
+// CS2); a defuse runs while m_hBombDefuser holds the defusing player.
 stock float GetBombDefuseTime()
 {
     int c4 = FindEntityByClassname(-1, "planted_c4");
-    if (c4 == -1 || !GetEntProp(c4, Prop_Send, "m_bBeingDefused"))
+    if (c4 == -1 || !HasEntProp(c4, Prop_Send, "m_hBombDefuser") || GetEntPropEnt(c4, Prop_Send, "m_hBombDefuser") == -1)
         return -1.0;
 
     float remaining = GetEntPropFloat(c4, Prop_Send, "m_flDefuseCountDown") - GetGameTime();

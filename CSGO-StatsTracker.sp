@@ -24,7 +24,7 @@ public Plugin:myinfo =
     name = "HvH.gg - Global stats tracker",
     author = "imi-tat0r",
     description = "Global HvH ranking and statistics by hvh.gg",
-    version = "v1.0.1"
+    version = "v1.0.2"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
