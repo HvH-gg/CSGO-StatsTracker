@@ -1,6 +1,6 @@
 ![Copyright ev0lve Digital](https://img.shields.io/badge/Copyright-ev0lve%20Digital-blue)
 
-# [HvH.gg](https://hvh.gg) CSGO Stats Tracker (1.0.1)
+# [HvH.gg](https://hvh.gg) CSGO Stats Tracker (1.0.2)
 
 Our CSGO Stats tracker plugin enables stats tracking for all players on a server.
 
