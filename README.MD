@@ -1,6 +1,6 @@
 ![Copyright ev0lve Digital](https://img.shields.io/badge/Copyright-ev0lve%20Digital-blue)
 
-# [HvH.gg](https://hvh.gg) CSGO Stats Tracker (1.0.2)
+# [HvH.gg](https://hvh.gg) CSGO Stats Tracker (1.1.0)
 
 Our CSGO Stats tracker plugin enables stats tracking for all players on a server.
 
@@ -34,6 +34,9 @@ When updating, keep your existing config file so your API Key is not overwritten
 	}
 }
 ```
+
+# Match systems
+If your match system has its own match ids, set `hvhgg_match_id "YOUR_MATCH_ID"` when a match starts and empty it (`hvhgg_match_id ""`) when it is over. Rounds are sent with it, so the match can be found by your id.
 
 # Credits
 - [HvH.gg](https://hvh.gg)

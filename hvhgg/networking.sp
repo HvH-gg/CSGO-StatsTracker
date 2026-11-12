@@ -11,6 +11,9 @@ void Networking_Init()
 {
     if (g_HvHggToken[0] == '\0')
         SetFailState("[HvH.gg] No API key configured, refusing to start.");
+
+    // the existing variable when another plugin (HvH.gg Recast) made it first
+    CreateConVar("hvhgg_match_id", "", "set by a partner's match system: its id of the running match (at most 64 characters, empty when there is none)");
 }
 
 // Appends the cvars the backend reads (game mode detection and external match id).
@@ -26,6 +29,23 @@ static void AddCvar(JSONArray cvars, const char[] name)
     PushKv(cvars, name, value);
 }
 
+// hvhgg_match_id: a partner's match system sets it to its id of the running match, this plugin only reads it
+// (HvH.gg Recast has the same variable). Sent when set, at most 64 characters.
+static void AddPartnerMatchId(JSONArray cvars)
+{
+    ConVar cvar = FindConVar("hvhgg_match_id");
+    if (cvar == null)
+        return;
+
+    char value[128];
+    cvar.GetString(value, sizeof(value));
+    TrimString(value);
+    if (value[0] == '\0' || strlen(value) > 64)
+        return;
+
+    PushKv(cvars, "hvhgg_match_id", value);
+}
+
 static JSONArray BuildCvars()
 {
     JSONArray cvars = new JSONArray();
@@ -34,6 +54,7 @@ static JSONArray BuildCvars()
     AddCvar(cvars, "game_mode");
     AddCvar(cvars, "mp_teammates_are_enemies");
     AddCvar(cvars, "steamworks_sessionid_server");
+    AddPartnerMatchId(cvars);
 
     return cvars;
 }
