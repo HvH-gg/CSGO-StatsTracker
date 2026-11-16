@@ -34,6 +34,12 @@ methodmap PlayerInfo < JSONObject
 		public get() { return this.GetBool("isBot"); }
 		public set(bool value) { this.SetBool("isBot", value); }
 	}
+
+	// Latency in ms as the scoreboard shows it. Left out for bots.
+	property int Ping {
+		public get() { return this.GetInt("ping"); }
+		public set(int value) { this.SetInt("ping", value); }
+	}
 };
 
 // Mirrors hvhgg_common.Models.Stats.RoundCombatPlayer. Values are match totals,

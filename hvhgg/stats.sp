@@ -193,6 +193,8 @@ void Stats_OnRoundStart(Event event, const char[] name)
         p.TeamId = GetClientTeam(i);
         p.CheatId = 0;
         p.IsBot = isBot;
+        if (!isBot)
+            p.Ping = RoundToNearest(GetClientAvgLatency(i, NetFlow_Outgoing) * 1000.0);
 
         g_RoundPlayers.Push(p);
         delete p;
