@@ -167,6 +167,28 @@ void Stats_OnRoundStart(Event event, const char[] name)
 
     PrintToServer("[HvH.gg] Handling %s.", name);
 
+    Stats_StartRound();
+}
+
+// Closes the running deathmatch piece once it is DeathmatchSegmentSeconds old, the next one starts with the players
+// as they are now. Loaded in the middle of a deathmatch (its only round_start long gone) a piece starts right away.
+void Stats_OnTick()
+{
+    if (!g_CollectEvents)
+        return;
+
+    int seconds = g_DeathmatchSegmentSeconds > 10 ? g_DeathmatchSegmentSeconds : 10;
+    if (g_CurrentSegment > 0 && GetGameTime() - g_SegmentStartedAt >= float(seconds)) {
+        Networking_SendRound();
+        Stats_StartRound();
+    }
+    else if (g_CurrentSegment == 0 && !g_RoundStarted && IsDeathmatch())
+        Stats_StartRound();
+}
+
+// Starts a new round buffer (or deathmatch piece). The backend needs round_start as the first event of every round.
+void Stats_StartRound()
+{
     delete g_RoundEvents;
     delete g_RoundPlayers;
 
@@ -174,6 +196,9 @@ void Stats_OnRoundStart(Event event, const char[] name)
     g_RoundPlayers = new JSONArray();
     g_EventNumber = 0;
     g_RoundClosed = false;
+    g_RoundStarted = true;
+    g_CurrentSegment = IsDeathmatch() ? ++g_SegmentCount : 0;
+    g_SegmentStartedAt = GetGameTime();
 
     GetCurrentMap(g_RoundMap, sizeof(g_RoundMap));
 
@@ -381,7 +406,6 @@ void Stats_OnMatchEnd(Event event, const char[] name)
 
     // flush what is buffered, the next round_start may never arrive
     Networking_SendRound();
-    g_RoundClosed = false;
 
     g_CollectEvents = false;
 }

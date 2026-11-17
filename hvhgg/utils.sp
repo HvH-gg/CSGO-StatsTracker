@@ -49,6 +49,14 @@ stock bool IsWarmupPeriod()
     return GameRules_GetProp("m_bWarmupPeriod") != 0;
 }
 
+// game_type 1 with game_mode 2, the same check the backend makes
+stock bool IsDeathmatch()
+{
+    ConVar gameType = FindConVar("game_type");
+    ConVar gameMode = FindConVar("game_mode");
+    return gameType != null && gameMode != null && gameType.IntValue == 1 && gameMode.IntValue == 2;
+}
+
 // Same team and not FFA (mp_teammates_are_enemies), i.e. damage between them is friendly fire.
 stock bool AreTeammates(int a, int b)
 {

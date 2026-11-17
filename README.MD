@@ -1,6 +1,6 @@
 ![Copyright ev0lve Digital](https://img.shields.io/badge/Copyright-ev0lve%20Digital-blue)
 
-# [HvH.gg](https://hvh.gg) CSGO Stats Tracker (1.2.0)
+# [HvH.gg](https://hvh.gg) CSGO Stats Tracker (1.3.0)
 
 Our CSGO Stats tracker plugin enables stats tracking for all players on a server.
 
@@ -38,8 +38,28 @@ When updating, keep your existing config file so your API Key is not overwritten
 	{
 		"value"		"https://hvh.gg/api/"
 	}
+
+	// optional, these are the defaults
+	"DeathmatchSegmentSeconds"
+	{
+		"value"		"60"
+	}
+	"RetryQueueSize"
+	{
+		"value"		"500"
+	}
+	"RetryMaxAgeMinutes"
+	{
+		"value"		"300"
+	}
+	"RetryMaxDelaySeconds"
+	{
+		"value"		"300"
+	}
 }
 ```
+
+A deathmatch has no rounds, so it is sent every `DeathmatchSegmentSeconds`. Rounds that cannot be sent (HvH.gg not reachable) are kept, sent again in order, and saved to `addons/sourcemod/data/hvhgg_pending_rounds.json` when the plugin unloads.
 
 # Match systems
 If your match system has its own match ids, set `hvhgg_match_id "YOUR_MATCH_ID"` when a match starts and empty it (`hvhgg_match_id ""`) when it is over. Rounds are sent with it, so the match can be found by your id.

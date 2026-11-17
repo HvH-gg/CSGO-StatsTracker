@@ -24,7 +24,7 @@ public Plugin:myinfo =
     name = "HvH.gg - Global stats tracker",
     author = "imi-tat0r",
     description = "Global HvH ranking and statistics by hvh.gg",
-    version = "v1.2.0"
+    version = "v1.3.0"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
@@ -59,12 +59,36 @@ public void OnPluginStart()
     PrintToServer("[HvH.gg] Stats tracker initialized.");
     // show ad every 10 minutes
     CreateTimer(600.0, Advertising, _, TIMER_REPEAT);
+    // closes deathmatch pieces and retries unsent rounds; runs across map changes
+    CreateTimer(1.0, Tick, _, TIMER_REPEAT);
+
+    // rounds the last unload could not send go out first
+    Networking_LoadQueue();
+}
+
+public void OnPluginEnd()
+{
+    // the running deathmatch piece and everything unsent are kept on disk for the next load
+    g_Unloading = true;
+    if (g_CurrentSegment > 0)
+        Networking_SendRound();
+    Networking_SaveQueue();
+}
+
+public Action Tick(Handle timer)
+{
+    Stats_OnTick();
+    Networking_Pump();
+    return Plugin_Continue;
 }
 
 public void OnMapStart()
 {
     // a match that ended with cs_win_panel_match stopped the collection, a new map always starts it again
     g_CollectEvents = true;
+    g_SegmentCount = 0;
+    g_CurrentSegment = 0;
+    g_RoundStarted = false;
     Stats_NewMatchId();
 }
 
@@ -72,7 +96,6 @@ public void OnMapEnd()
 {
     // the next round_start happens on another map, so flush here
     Networking_SendRound();
-    g_RoundClosed = false;
 }
 
 public Action GetServerIPTimer(Handle timer)
@@ -139,9 +162,25 @@ void LoadConfig()
         kv.GoBack();
     }
 
+    g_DeathmatchSegmentSeconds = ReadConfigInt(kv, "DeathmatchSegmentSeconds", g_DeathmatchSegmentSeconds);
+    g_RetryQueueSize = ReadConfigInt(kv, "RetryQueueSize", g_RetryQueueSize);
+    g_RetryMaxAgeMinutes = ReadConfigInt(kv, "RetryMaxAgeMinutes", g_RetryMaxAgeMinutes);
+    g_RetryMaxDelaySeconds = ReadConfigInt(kv, "RetryMaxDelaySeconds", g_RetryMaxDelaySeconds);
+
     PrintToServer("[HvH.gg] Loaded configuration (api %s).", g_HvHggApiUrl);
 
     delete kv;
+}
+
+// An optional { "value" "..." } entry of the config, the default when it is missing.
+int ReadConfigInt(KeyValues kv, const char[] key, int defaultValue)
+{
+    if (!KvJumpToKey(kv, key))
+        return defaultValue;
+
+    int value = kv.GetNum("value", defaultValue);
+    kv.GoBack();
+    return value;
 }
 
 public Action Advertising(Handle timer)
