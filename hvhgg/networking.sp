@@ -35,9 +35,11 @@ void Networking_Init()
     g_Pending = new JSONArray();
 
     // the existing variable when another plugin (HvH.gg Recast) made it first
-    // for a server that runs its deathmatch only at times (a cfg per map or mode sets it); the config's Deathmatch is
-    // the same switch for one that always does
-    CreateConVar("hvhgg_deathmatch", "0", "1 while the server runs a deathmatch made by a plugin (not detected: game_type and game_mode are not deathmatch there)", _, true, 0.0, true, 1.0);
+    // The config's Deathmatch is what it starts as (on only: HvH.gg Recast has the same variable and may have set it); a
+    // server that runs its deathmatch only at times sets it in the cfg of the mode.
+    ConVar deathmatch = CreateConVar("hvhgg_deathmatch", "0", "1 while the server runs a deathmatch made by a plugin (not detected: game_type and game_mode are not deathmatch there); starts as Deathmatch in the config", _, true, 0.0, true, 1.0);
+    if (g_Deathmatch && deathmatch != null)
+        deathmatch.SetBool(true);
     CreateConVar("hvhgg_match_id", "", "set by a partner's match system: its id of the running match (at most 64 characters, empty when there is none)");
 }
 

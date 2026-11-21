@@ -24,7 +24,7 @@ public Plugin:myinfo =
     name = "HvH.gg - Global stats tracker",
     author = "imi-tat0r",
     description = "Global HvH ranking and statistics by hvh.gg",
-    version = "v1.4.0"
+    version = "v1.5.0"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
@@ -41,6 +41,7 @@ public void OnPluginStart()
     LoadConfig();
 
     Networking_Init();
+    RegServerCmd("hvhgg_reload_config", Command_ReloadConfig, "HvH.gg Stats Tracker: read the config file again");
     Events_Init();
     Stats_Init();
 
@@ -129,6 +130,18 @@ public void OnClientAuthorized(int client, const char[] auth)
 public void OnClientDisconnect(int client)
 {
     Stats_OnClientDisconnect(client);
+}
+
+// Reads the config file again without a reload of the plugin: the key, the retry settings, and hvhgg_deathmatch is set
+// to Deathmatch (here also to off: the file was changed to say so).
+public Action Command_ReloadConfig(int args)
+{
+    LoadConfig();
+    ConVar deathmatch = FindConVar("hvhgg_deathmatch");
+    if (deathmatch != null)
+        deathmatch.SetBool(g_Deathmatch);
+    PrintToServer("[HvH.gg] config reloaded: deathmatch=%d", g_Deathmatch ? 1 : 0);
+    return Plugin_Handled;
 }
 
 void LoadConfig()

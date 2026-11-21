@@ -20,7 +20,7 @@ bool g_RoundClosed = false;
 bool g_RoundStarted = false;
 
 // From the config: the server runs a deathmatch made by a plugin (game_type and game_mode are not deathmatch there,
-// so it is not detected).
+// so it is not detected). What hvhgg_deathmatch starts as.
 bool g_Deathmatch = false;
 
 // A deathmatch has one long round, so it is sent in pieces (segments) of DeathmatchSegmentSeconds instead of at its

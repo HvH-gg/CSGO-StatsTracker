@@ -49,12 +49,12 @@ stock bool IsWarmupPeriod()
     return GameRules_GetProp("m_bWarmupPeriod") != 0;
 }
 
-// game_type 1 with game_mode 2 (the same check the backend makes), or the config or hvhgg_deathmatch says the server
-// runs one (a plugin's; the backend takes the pieces sent then as a deathmatch)
+// game_type 1 with game_mode 2 (the same check the backend makes), or hvhgg_deathmatch says the server runs one (a
+// plugin's; the backend takes the pieces sent then as a deathmatch)
 stock bool IsDeathmatch()
 {
     ConVar forced = FindConVar("hvhgg_deathmatch");
-    if (g_Deathmatch || (forced != null && forced.BoolValue))
+    if (forced != null && forced.BoolValue)
         return true;
     ConVar gameType = FindConVar("game_type");
     ConVar gameMode = FindConVar("game_mode");
