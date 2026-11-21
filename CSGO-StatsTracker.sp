@@ -24,7 +24,7 @@ public Plugin:myinfo =
     name = "HvH.gg - Global stats tracker",
     author = "imi-tat0r",
     description = "Global HvH ranking and statistics by hvh.gg",
-    version = "v1.3.0"
+    version = "v1.4.0"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
@@ -162,6 +162,7 @@ void LoadConfig()
         kv.GoBack();
     }
 
+    g_Deathmatch = ReadConfigInt(kv, "Deathmatch", 0) != 0;
     g_DeathmatchSegmentSeconds = ReadConfigInt(kv, "DeathmatchSegmentSeconds", g_DeathmatchSegmentSeconds);
     g_RetryQueueSize = ReadConfigInt(kv, "RetryQueueSize", g_RetryQueueSize);
     g_RetryMaxAgeMinutes = ReadConfigInt(kv, "RetryMaxAgeMinutes", g_RetryMaxAgeMinutes);

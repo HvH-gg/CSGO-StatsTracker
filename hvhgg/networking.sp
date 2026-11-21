@@ -35,6 +35,9 @@ void Networking_Init()
     g_Pending = new JSONArray();
 
     // the existing variable when another plugin (HvH.gg Recast) made it first
+    // for a server that runs its deathmatch only at times (a cfg per map or mode sets it); the config's Deathmatch is
+    // the same switch for one that always does
+    CreateConVar("hvhgg_deathmatch", "0", "1 while the server runs a deathmatch made by a plugin (not detected: game_type and game_mode are not deathmatch there)", _, true, 0.0, true, 1.0);
     CreateConVar("hvhgg_match_id", "", "set by a partner's match system: its id of the running match (at most 64 characters, empty when there is none)");
 }
 

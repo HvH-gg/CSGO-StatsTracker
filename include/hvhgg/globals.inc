@@ -19,6 +19,10 @@ bool g_RoundClosed = false;
 // The buffer was started with a round_start (by the game or as a deathmatch piece).
 bool g_RoundStarted = false;
 
+// From the config: the server runs a deathmatch made by a plugin (game_type and game_mode are not deathmatch there,
+// so it is not detected).
+bool g_Deathmatch = false;
+
 // A deathmatch has one long round, so it is sent in pieces (segments) of DeathmatchSegmentSeconds instead of at its
 // end: a crash or map change loses at most one piece. Numbered per map from 1; 0 while buffering a round.
 int g_SegmentCount = 0;
